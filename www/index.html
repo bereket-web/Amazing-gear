@@ -1,0 +1,51 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Amazing Gear Rebuilt</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:Arial,sans-serif}
+#game{position:fixed;inset:0;width:100%;height:100%;touch-action:none;background:#000}
+#hud{position:fixed;top:10px;left:0;right:0;text-align:center;color:#fff;font-weight:bold;font-size:28px;text-shadow:0 2px 3px #000;pointer-events:none}
+#menu{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#000d;color:white;gap:18px}
+#menu h1{font-size:42px;margin:0;text-shadow:0 3px #555}
+button{font-size:22px;padding:14px 34px;border:0;border-radius:10px;background:#fff;color:#111}
+#hint{font-size:15px;opacity:.8;text-align:center;max-width:300px}.hidden{display:none!important}
+</style></head><body>
+<canvas id="game"></canvas><div id="hud">0</div>
+<div id="menu"><h1>AMAZING GEAR</h1><button id="start">PLAY</button>
+<div id="hint">Touch the left or right side to steer. Avoid the colored barriers.</div></div>
+<script>
+const C=document.getElementById("game"),ctx=C.getContext("2d"),menu=document.getElementById("menu");
+const hud=document.getElementById("hud"),start=document.getElementById("start");
+let W=360,H=640,DPR=1,running=false,score=0,last=0,spawn=0,speed=180,colorIndex=0;
+const gear={x:0,y:0,r:28,vx:0,vy:0,rot:0};
+const colors=["#e53935","#f9c23c","#43a047","#1e88e5","#8e44ad","#eee"];
+const img=new Image();img.src="assets/gear_white.png";
+const sounds={};for(const n of ["brick","button","jump","score"]){sounds[n]=new Audio("assets/"+n+".ogg")}
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;C.width=W*DPR;C.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0)}resize();addEventListener("resize",resize);
+function reset(){score=0;speed=Math.max(170,H*.28);colorIndex=0;spawn=.3;gear.x=W/2;gear.y=H*.23;gear.vx=0;gear.vy=0;gear.rot=0;hud.textContent="0"}
+function addBarrier(){
+ const y=-28,gap=70+Math.random()*55,left=Math.random()*(W-gap-50)+25,w=18;
+ const a=[{x:left-gap/2-w/2,y,w,h:14},{x:left+gap/2-w/2,y,w,h:14}];
+ if(Math.random()<.7)a.push({x:0,y:y-7,w:a[0].x-4,h:14});
+ if(Math.random()<.7){let x=a[1].x+w+4;a.push({x,y:y-7,w:W-x,h:14})}
+ a.forEach(b=>barriers.push({...b,c:colorIndex}))
+}
+let barriers=[];
+function draw(){ctx.fillStyle="#000";ctx.fillRect(0,0,W,H);for(const b of barriers){ctx.fillStyle=colors[b.c%colors.length];ctx.fillRect(b.x,b.y,b.w,b.h);ctx.fillStyle="#fff5";ctx.fillRect(b.x,b.y,b.w,2)}ctx.save();ctx.translate(gear.x,gear.y);ctx.rotate(gear.rot);if(img.complete)ctx.drawImage(img,-gear.r,-gear.r,gear.r*2,gear.r*2);ctx.restore()}
+function hit(b){return gear.x+gear.r>b.x&&gear.x-gear.r<b.x+b.w&&gear.y+gear.r>b.y&&gear.y-gear.r<b.y+b.h}
+function over(){running=false;try{sounds.brick.play()}catch(e){}menu.classList.remove("hidden");start.textContent="REPLAY";document.getElementById("hint").textContent="Score: "+score+"  •  Touch PLAY to try again"}
+function loop(t){if(!running)return;let dt=Math.min((t-last)/1000,.033);last=t;
+ gear.vy+=500*dt;gear.y+=gear.vy*dt;gear.x+=gear.vx*dt;gear.rot+=gear.vx*.008;gear.vx*=Math.pow(.001,dt);
+ if(gear.x<gear.r){gear.x=gear.r;gear.vx=Math.abs(gear.vx)*.2}if(gear.x>W-gear.r){gear.x=W-gear.r;gear.vx=-Math.abs(gear.vx)*.2}
+ spawn-=dt;if(spawn<=0){addBarrier();spawn=Math.max(.48,1.05-speed/650);speed+=.7}
+ for(const b of barriers)b.y+=speed*dt;
+ for(const b of barriers)if(hit(b)){over();return}
+ let old=barriers.length;barriers=barriers.filter(b=>b.y<H+30);let passed=old-barriers.length;
+ if(passed){score+=passed;hud.textContent=score;if(score&&score%10===0){colorIndex=(colorIndex+1)%colors.length;try{sounds.score.play()}catch(e){}}}
+ if(gear.y>H+80){over();return}draw();requestAnimationFrame(loop)}
+function steer(x){if(!running)return;gear.vx+=(x<W/2?-520:520);gear.vy=-115;try{sounds.jump.currentTime=0;sounds.jump.play()}catch(e){}}
+C.addEventListener("pointerdown",e=>{e.preventDefault();steer(e.clientX)});addEventListener("keydown",e=>{if(e.key==="ArrowLeft")steer(0);if(e.key==="ArrowRight")steer(W);if(e.key===" "&&!running)startGame()});
+function startGame(){reset();menu.classList.add("hidden");running=true;last=performance.now();try{sounds.button.play()}catch(e){}requestAnimationFrame(loop)}
+start.onclick=startGame;
+</script></body></html>
